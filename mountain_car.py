@@ -9,27 +9,24 @@ import sklearn.pipeline
 import sklearn.preprocessing
 
 env = gym.make('MountainCar-v0')
-env._max_episode_steps = 300
 
 
 num_episodes = 100
 discount_factor = 1.0
 alpha = 0.01
+nA = env.action_space.n
 
 #Parameter vector
-w = np.zeros((3,400))
+w = np.zeros((nA,400))
 
 # Plots
-plt_actions = np.zeros(3)
+plt_actions = np.zeros(nA)
 episode_rewards = np.zeros(num_episodes)
 
 # Get satistics over observation space samples for normalization
 observation_examples = np.array([env.observation_space.sample() for x in range(10000)])
-scale_mean = np.mean(observation_examples,axis=0)
-scale_std = np.std(observation_examples,axis=0)
 scaler = sklearn.preprocessing.StandardScaler()
 scaler.fit(observation_examples)
-
 
 # Create radial basis function sampler to convert states to features for nonlinear function approx
 featurizer = sklearn.pipeline.FeatureUnion([
@@ -38,10 +35,12 @@ featurizer = sklearn.pipeline.FeatureUnion([
         ("rbf3", RBFSampler(gamma=1.0, n_components=100)),
         ("rbf4", RBFSampler(gamma=0.5, n_components=100))
 		])
+# Fit featurizer to our scaled inputs
 featurizer.fit(scaler.transform(observation_examples))
 
 # Normalize and turn into feature
 def featurize_state(state):
+	# Transform data
 	scaled = scaler.transform([state])
 	featurized = featurizer.transform(scaled)
 	return featurized
@@ -52,12 +51,13 @@ def Q(state,action,w):
 
 # Epsilon greedy policy
 def policy(state, weight, epsilon=0.1):
-	A = np.ones(3,dtype=float) * epsilon/3
-	best_action =  np.argmax([Q(state,a,w) for a in range(3)])
+	A = np.ones(nA,dtype=float) * epsilon/nA
+	best_action =  np.argmax([Q(state,a,w) for a in range(nA)])
 	A[best_action] += (1.0-epsilon)
-	sample = np.random.choice(3,p=A)
+	sample = np.random.choice(nA,p=A)
 	return sample
 
+# OPTIONAL check gradients 
 def check_gradients(index,state,next_state,next_action,weight,reward):
 
 	ew1 = np.array(weight, copy=True) 
@@ -69,8 +69,6 @@ def check_gradients(index,state,next_state,next_action,weight,reward):
 	test_target_1 = reward + discount_factor * Q(next_state,next_action,ew1)		
 	td_error_1 = target - Q(state,action,ew1)
 
-
-
 	test_target_2 = reward + discount_factor * Q(next_state,next_action,ew2)		
 	td_error_2 = target - Q(state,action,ew2)
 
@@ -78,8 +76,6 @@ def check_gradients(index,state,next_state,next_action,weight,reward):
 	
 	return grad[0]
 
-
-cost = []
 
 # Our main training loop
 for e in range(num_episodes):
@@ -89,7 +85,7 @@ for e in range(num_episodes):
 
 	while True:
 
-		env.render()
+		#env.render()
 		# Sample from our policy
 		action = policy(state,w)
 		# Staistic for graphing
@@ -109,7 +105,6 @@ for e in range(num_episodes):
 		td_error = target - Q(state,action,w)
 
 		# Find gradient with code to check it commented below (check passes)
-		#dw = (state).T.dot(td_error)
 		dw = (td_error).dot(state)
 		
 		#for i in range(4):
@@ -128,7 +123,7 @@ def plot_cost_to_go_mountain_car(num_tiles=20):
     x = np.linspace(env.observation_space.low[0], env.observation_space.high[0], num=num_tiles)
     y = np.linspace(env.observation_space.low[1], env.observation_space.high[1], num=num_tiles)
     X, Y = np.meshgrid(x, y)
-    Z = np.apply_along_axis(lambda _: -np.max([Q(featurize_state(_),a,w) for a in range(3)]), 2, np.dstack([X, Y]))
+    Z = np.apply_along_axis(lambda _: -np.max([Q(featurize_state(_),a,w) for a in range(nA)]), 2, np.dstack([X, Y]))
 
     fig = plt.figure(figsize=(10, 5))
     ax = fig.add_subplot(111, projection='3d')
@@ -143,13 +138,13 @@ def plot_cost_to_go_mountain_car(num_tiles=20):
 
 
 # Show bar graph of actions chosen
-plt.bar(np.arange(3),plt_actions)
+plt.bar(np.arange(nA),plt_actions)
 
 plt.figure()
 # Plot the reward over all episodes
 plt.plot(np.arange(num_episodes),episode_rewards)
 plt.show()
+# plot our final Q function
 plot_cost_to_go_mountain_car()
-
 
 env.close()
