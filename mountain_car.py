@@ -11,12 +11,12 @@ import sklearn.preprocessing
 env = gym.make('MountainCar-v0')
 
 
-num_episodes = 100
+num_episodes = 200
 discount_factor = 1.0
 alpha = 0.01
 nA = env.action_space.n
 
-#Parameter vector
+#Parameter vector define number of parameters per action based on featurizer size
 w = np.zeros((nA,400))
 
 # Plots
@@ -102,7 +102,7 @@ for e in range(num_episodes):
 
 		# Figure out target and td error
 		target = reward + discount_factor * Q(next_state,next_action,w)		
-		td_error = target - Q(state,action,w)
+		td_error = Q(state,action,w) - target
 
 		# Find gradient with code to check it commented below (check passes)
 		dw = (td_error).dot(state)
@@ -112,7 +112,7 @@ for e in range(num_episodes):
 		#	print(str(i) + ": " + str(check_gradients(i,state,next_state,next_action,w,reward)) + " " + str(dw[i]))
 
 		# Update weight
-		w[action] += alpha * dw
+		w[action] -= alpha * dw
 
 		if done:
 			break
